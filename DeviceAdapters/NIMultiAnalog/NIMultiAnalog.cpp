@@ -30,6 +30,7 @@
 
 const char* g_DeviceNameMultiAnalogOutHub = "NIMultiAnalogOutHub";
 const char* g_DeviceNameMultiAnalogOutPortPrefix = "NIMultiAnalogOut-";
+const char* g_DeviceNameDigitalOutputPortPrefix = "NIDigitalOutput-";
 
 const char* g_On = "On";
 const char* g_Off = "Off";
@@ -1045,4 +1046,238 @@ int MultiAnalogOutPort::StopTask()
    LogMessage("Stopped task", true);
 
    return DEVICE_OK;
+}
+
+
+DigitalOutputPort::DigitalOutputPort(const std::string& port) :
+    ErrorTranslator(22000, 22999, &DigitalOutputPort::SetErrorText),
+    niPort_(port),
+    initialized_(false),
+    sequenceRunning_(false),
+    numPos_(8)
+{
+    CPropertyAction* pAct = new CPropertyAction(this, &DigitalOutputPort::OnSequenceable);
+    CreateStringProperty("Sequencing", g_UseHubSetting, false, pAct, true);
+    AddAllowedValue("Sequencing", g_UseHubSetting);
+    AddAllowedValue("Sequencing", g_Never);
+}
+
+
+DigitalOutputPort::~DigitalOutputPort()
+{
+    Shutdown();
+}
+
+
+int DigitalOutputPort::Initialize()
+{
+    if (initialized_)
+        return DEVICE_OK;
+
+    // Need to set all pins of the port to output pins here on in Hub
+
+
+    return DEVICE_OK;
+}
+
+
+int DigitalOutputPort::Shutdown()
+{
+    if (!initialized_)
+        return DEVICE_OK;
+
+    int err = StopTask();
+
+    initialized_ = false;
+    return err;
+}
+
+
+void DigitalOutputPort::GetName(char* name) const
+{
+    CDeviceUtils::CopyLimitedString(name,
+        (g_DeviceNameDigitalOutputPortPrefix + niPort_).c_str());
+}
+
+
+int DigitalOutputPort::OnState(MM::PropertyBase* pProp, MM::ActionType eAct)
+{
+    if (eAct == MM::BeforeGet)
+    {
+        // nothing to do, let the caller use cached property
+    }
+    else if (eAct == MM::AfterSet)
+    {
+        long pos;
+        pProp->Get(pos);
+        return StartOnDemandTask(pos);
+    }
+    /*
+    else if (eAct == MM::IsSequenceable)
+    {
+        if (sequenceOn_)
+            pProp->SetSequenceable(NUMPATTERNS);
+        else
+            pProp->SetSequenceable(0);
+    }
+    else if (eAct == MM::AfterLoadSequence)
+    {
+        std::vector<std::string> sequence = pProp->GetSequence();
+        std::ostringstream os;
+        if (sequence.size() > NUMPATTERNS)
+            return DEVICE_SEQUENCE_TOO_LARGE;
+        unsigned char* seq = new unsigned char[sequence.size()];
+        for (unsigned int i = 0; i < sequence.size(); i++)
+        {
+            std::istringstream os(sequence[i]);
+            int val;
+            os >> val;
+            seq[i] = (unsigned char)val;
+        }
+        int ret = LoadSequence((unsigned)sequence.size(), seq);
+        if (ret != DEVICE_OK)
+            return ret;
+
+        delete[] seq;
+    }
+    else if (eAct == MM::StartSequence)
+    {
+        MMThreadGuard myLock(hub->GetLock());
+
+        hub->PurgeComPortH();
+        unsigned char command[1];
+        command[0] = 8;
+        int ret = hub->WriteToComPortH((const unsigned char*)command, 1);
+        if (ret != DEVICE_OK)
+            return ret;
+
+        MM::MMTime startTime = GetCurrentMMTime();
+        unsigned long bytesRead = 0;
+        unsigned char answer[1];
+        while ((bytesRead < 1) && ((GetCurrentMMTime() - startTime).getMsec() < 250)) {
+            unsigned long br;
+            ret = hub->ReadFromComPortH(answer + bytesRead, 1, br);
+            if (ret != DEVICE_OK)
+                return ret;
+            bytesRead += br;
+        }
+        if (answer[0] != 8)
+            return ERR_COMMUNICATION;
+    }
+    else if (eAct == MM::StopSequence)
+    {
+        MMThreadGuard myLock(hub->GetLock());
+
+        unsigned char command[1];
+        command[0] = 9;
+        int ret = hub->WriteToComPortH((const unsigned char*)command, 1);
+        if (ret != DEVICE_OK)
+            return ret;
+
+        MM::MMTime startTime = GetCurrentMMTime();
+        unsigned long bytesRead = 0;
+        unsigned char answer[2];
+        while ((bytesRead < 2) && ((GetCurrentMMTime() - startTime).getMsec() < 250)) {
+            unsigned long br;
+            ret = hub->ReadFromComPortH(answer + bytesRead, 2, br);
+            if (ret != DEVICE_OK)
+                return ret;
+            bytesRead += br;
+        }
+        if (answer[0] != 9)
+            return ERR_COMMUNICATION;
+
+        std::ostringstream os;
+        os << "Sequence had " << (int)answer[1] << " transitions";
+        LogMessage(os.str().c_str(), false);
+
+    }
+    */
+    return DEVICE_OK;
+}
+
+
+int DigitalOutputPort::StopTask()
+{
+    if (!task_)
+        return DEVICE_OK;
+
+    int32 nierr = DAQmxClearTask(task_);
+    if (nierr != 0)
+        return TranslateNIError(nierr);
+    task_ = 0;
+    LogMessage("Stopped task", true);
+
+    return DEVICE_OK;
+}
+
+
+int DigitalOutputPort::StartOnDemandTask(long state)
+{
+    if (sequenceRunning_)
+        return ERR_SEQUENCE_RUNNING;
+
+    if (task_)
+    {
+        int err = StopTask();
+        if (err != DEVICE_OK)
+            return err;
+    }
+
+    LogMessage("Starting on-demand task", true);
+
+    int32 nierr = DAQmxCreateTask(NULL, &task_);
+    if (nierr != 0)
+    {
+        LogMessage(GetNIDetailedErrorForMostRecentCall().c_str());
+        return TranslateNIError(nierr);
+    }
+    LogMessage("Created task", true);
+
+
+    nierr = DAQmxCreateDOChan(task_,
+        niPort_.c_str(), NULL, DAQmx_Val_ChanForAllLines);
+    if (nierr != 0)
+    {
+        LogMessage(GetNIDetailedErrorForMostRecentCall().c_str());
+        goto error;
+    }
+    LogMessage("Created DO channel", true);
+
+    uInt8 samples[1];
+    samples[0] = (uInt8) state;
+    int32 numWritten = 0;
+    nierr = DAQmxWriteDigitalU8(task_, 1,
+        true, DAQmx_Val_WaitInfinitely, DAQmx_Val_GroupByChannel,
+        samples, &numWritten, NULL);
+    if (nierr != 0)
+    {
+        LogMessage(GetNIDetailedErrorForMostRecentCall().c_str());
+        goto error;
+    }
+    if (numWritten != 1)
+    {
+        LogMessage("Failed to write voltage");
+        // This is presumably unlikely; no error code here
+        goto error;
+    }
+    LogMessage(("Wrote Digital out with task autostart: " +
+        boost::lexical_cast<std::string>(state)).c_str(), true);
+
+    return DEVICE_OK;
+
+error:
+    DAQmxClearTask(task_);
+    task_ = 0;
+    int err;
+    if (nierr != 0)
+    {
+        LogMessage("Failed; task cleared");
+        err = TranslateNIError(nierr);
+    }
+    else
+    {
+        err = DEVICE_ERR;
+    }
+    return err;
 }

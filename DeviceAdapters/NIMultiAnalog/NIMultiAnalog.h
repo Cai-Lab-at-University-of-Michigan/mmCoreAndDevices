@@ -208,3 +208,40 @@ private:
    std::vector<double> unsentSequence_;
    std::vector<double> sentSequence_; // Pretend "sent" to device
 };
+
+class DigitalOutputPort : public CStateDeviceBase<DigitalOutputPort>, 
+    ErrorTranslator<DigitalOutputPort>
+{
+public:
+    DigitalOutputPort(const std::string& port);
+    virtual ~DigitalOutputPort();
+
+    virtual int Initialize();
+    virtual int Shutdown();
+
+    virtual void GetName(char* name) const;
+    virtual bool Busy() { return false; }
+
+    virtual unsigned long GetNumberOfPositions()const { return numPos_; }
+
+    // action interface
+    // ----------------
+    int OnState(MM::PropertyBase* pProp, MM::ActionType eAct);
+    //int OnBlanking(MM::PropertyBase* pProp, MM::ActionType eAct);
+    //int OnBlankingTriggerDirection(MM::PropertyBase* pProp, MM::ActionType eAct);
+
+    //int OnSequence(MM::PropertyBase* pProp, MM::ActionType eAct);
+
+private:
+    int OnSequenceable(MM::PropertyBase* pProp, MM::ActionType eAct);
+    int StartOnDemandTask(long state);
+    int StopTask();
+
+    std::string niPort_;
+    bool initialized_;
+    bool sequenceRunning_;
+    long numPos_;
+
+    TaskHandle task_;
+};
+
