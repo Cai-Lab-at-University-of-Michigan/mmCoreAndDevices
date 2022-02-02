@@ -72,7 +72,8 @@ MODULE_API MM::Device* CreateDevice(const char* deviceName)
    else if (std::string(deviceName).substr(0, strlen(g_DeviceNameDigitalOutputPortPrefix)) ==
        g_DeviceNameDigitalOutputPortPrefix)
    {
-       return new DigitalOutputPort(std::string(deviceName));
+      return new DigitalOutputPort(std::string(deviceName).
+         substr(strlen(g_DeviceNameDigitalOutputPortPrefix)));
    }
 
    return 0;
