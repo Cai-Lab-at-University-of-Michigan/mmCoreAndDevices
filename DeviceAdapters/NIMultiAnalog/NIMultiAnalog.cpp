@@ -69,6 +69,11 @@ MODULE_API MM::Device* CreateDevice(const char* deviceName)
       return new MultiAnalogOutPort(std::string(deviceName).
          substr(strlen(g_DeviceNameMultiAnalogOutPortPrefix)));
    }
+   else if (std::string(deviceName).substr(0, strlen(g_DeviceNameDigitalOutputPortPrefix)) ==
+       g_DeviceNameDigitalOutputPortPrefix)
+   {
+       return new DigitalOutputPort(std::string(deviceName));
+   }
 
    return 0;
 }
@@ -210,6 +215,21 @@ int MultiAnalogOutHub::DetectInstalledDevices()
          AddInstalledDevice(pDevice);
       }
    }
+
+   std::vector<std::string> doPorts =
+       GetDigitalPortsForDevice(niDeviceName_);
+
+   for (std::vector<std::string>::const_iterator it = doPorts.begin(), end = doPorts.end();
+       it != end; ++it)
+   {
+       MM::Device* pDevice =
+           ::CreateDevice((g_DeviceNameDigitalOutputPortPrefix + *it).c_str());
+       if (pDevice)
+       {
+           AddInstalledDevice(pDevice);
+       }
+   }
+
    return DEVICE_OK;
 }
 
@@ -395,6 +415,27 @@ MultiAnalogOutHub::GetAnalogPortsForDevice(const std::string& device)
    }
 
    return result;
+}
+
+std::vector<std::string>
+MultiAnalogOutHub::GetDigitalPortsForDevice(const std::string& device)
+{
+    std::vector<std::string> result;
+
+    char ports[4096];
+    int32 nierr = DAQmxGetDevDOPorts(device.c_str(), ports, sizeof(ports));
+    if (nierr == 0)
+    {
+        boost::split(result, ports, boost::is_any_of(", "),
+            boost::token_compress_on);
+    }
+    else
+    {
+        LogMessage(GetNIDetailedErrorForMostRecentCall().c_str());
+        LogMessage("Cannot get list of digital ports");
+    }
+
+    return result;
 }
 
 
@@ -1054,7 +1095,9 @@ DigitalOutputPort::DigitalOutputPort(const std::string& port) :
     niPort_(port),
     initialized_(false),
     sequenceRunning_(false),
-    numPos_(8)
+    numPos_(8),
+    neverSequenceable_(false),
+    task_(0)
 {
     CPropertyAction* pAct = new CPropertyAction(this, &DigitalOutputPort::OnSequenceable);
     CreateStringProperty("Sequencing", g_UseHubSetting, false, pAct, true);
@@ -1076,6 +1119,9 @@ int DigitalOutputPort::Initialize()
 
     // Need to set all pins of the port to output pins here on in Hub
 
+    CPropertyAction* pAct = new CPropertyAction(this, &DigitalOutputPort::OnState);
+    CreateIntegerProperty("State", 0, false, pAct, false);
+    SetPropertyLimits("State", 0, 255); // TODO: discover dynamically
 
     return DEVICE_OK;
 }
@@ -1193,6 +1239,22 @@ int DigitalOutputPort::OnState(MM::PropertyBase* pProp, MM::ActionType eAct)
 
     }
     */
+    return DEVICE_OK;
+}
+
+
+int DigitalOutputPort::OnSequenceable(MM::PropertyBase* pProp, MM::ActionType eAct)
+{
+    if (eAct == MM::BeforeGet)
+    {
+        pProp->Set(neverSequenceable_ ? g_Never : g_UseHubSetting);
+    }
+    else if (eAct == MM::AfterSet)
+    {
+        std::string s;
+        pProp->Get(s);
+        neverSequenceable_ = (s == g_Never);
+    }
     return DEVICE_OK;
 }
 

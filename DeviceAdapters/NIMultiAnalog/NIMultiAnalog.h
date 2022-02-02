@@ -109,6 +109,8 @@ private:
       const std::string& device);
    std::vector<std::string> GetAnalogPortsForDevice(
       const std::string& device);
+   std::vector<std::string> GetDigitalPortsForDevice(
+       const std::string& device);
    std::string GetPhysicalChannelListForSequencing() const;
    int GetLCMSamplesPerChannel(size_t& seqLen) const;
    void GetLCMSequence(double* buffer) const;
@@ -241,6 +243,7 @@ private:
     bool initialized_;
     bool sequenceRunning_;
     long numPos_;
+    bool neverSequenceable_;
 
     TaskHandle task_;
 };
