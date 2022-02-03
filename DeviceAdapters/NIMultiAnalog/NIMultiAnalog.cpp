@@ -1096,7 +1096,8 @@ DigitalOutputPort::DigitalOutputPort(const std::string& port) :
     niPort_(port),
     initialized_(false),
     sequenceRunning_(false),
-    numPos_(8),
+    numPos_(0),
+    portWidth_(0),
     neverSequenceable_(false),
     task_(0)
 {
@@ -1119,10 +1120,18 @@ int DigitalOutputPort::Initialize()
         return DEVICE_OK;
 
     // Need to set all pins of the port to output pins here on in Hub
+    int32 nierr = DAQmxGetPhysicalChanDOPortWidth(niPort_.c_str(), &portWidth_);
+    if (nierr != 0)
+    {
+        LogMessage(GetNIDetailedErrorForMostRecentCall().c_str());
+        return TranslateNIError(nierr);
+    }
+    LogMessage("Created task", true);
+    numPos_ = (1 << portWidth_) - 1;
 
     CPropertyAction* pAct = new CPropertyAction(this, &DigitalOutputPort::OnState);
     CreateIntegerProperty("State", 0, false, pAct, false);
-    SetPropertyLimits("State", 0, 255); // TODO: discover dynamically
+    SetPropertyLimits("State", 0, numPos_);
 
     return DEVICE_OK;
 }
@@ -1307,16 +1316,40 @@ int DigitalOutputPort::StartOnDemandTask(long state)
     }
     LogMessage("Created DO channel", true);
 
-    uInt8 samples[1];
-    samples[0] = (uInt8) state;
+
     int32 numWritten = 0;
-    nierr = DAQmxWriteDigitalU8(task_, 1,
-        true, DAQmx_Val_WaitInfinitely, DAQmx_Val_GroupByChannel,
-        samples, &numWritten, NULL);
-    if (nierr != 0)
+
+    if (portWidth_ == 8)
     {
-        LogMessage(GetNIDetailedErrorForMostRecentCall().c_str());
-        goto error;
+       uInt8 samples[1];
+       samples[0] = (uInt8)state;
+       nierr = DAQmxWriteDigitalU8(task_, 1,
+          true, DAQmx_Val_WaitInfinitely, DAQmx_Val_GroupByChannel,
+          samples, &numWritten, NULL);
+       if (nierr != 0)
+       {
+          LogMessage(GetNIDetailedErrorForMostRecentCall().c_str());
+          goto error;
+       }
+    }
+    else if (portWidth_ == 32)
+    {
+       uInt32 samples[1];
+       samples[0] = (uInt32)state;
+       nierr = DAQmxWriteDigitalU32(task_, 1,
+          true, DAQmx_Val_WaitInfinitely, DAQmx_Val_GroupByChannel,
+          samples, &numWritten, NULL);
+       if (nierr != 0)
+       {
+          LogMessage(GetNIDetailedErrorForMostRecentCall().c_str());
+          goto error;
+       }
+    } 
+    else
+    {
+       LogMessage(("Found invalid number of pins per port: " +
+          boost::lexical_cast<std::string>(portWidth_)).c_str(), true);
+       goto error;
     }
     if (numWritten != 1)
     {

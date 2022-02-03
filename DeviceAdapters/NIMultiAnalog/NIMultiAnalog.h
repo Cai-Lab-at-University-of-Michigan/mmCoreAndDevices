@@ -243,6 +243,7 @@ private:
     bool initialized_;
     bool sequenceRunning_;
     long numPos_;
+    uInt32 portWidth_;
     bool neverSequenceable_;
 
     TaskHandle task_;
