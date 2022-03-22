@@ -18,17 +18,11 @@
     <ClCompile Include="module.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="error_code.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
     <ClCompile Include="FakeCamera.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="error_code.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
     <ClInclude Include="FakeCamera.h">
       <Filter>Header Files</Filter>
     </ClInclude>

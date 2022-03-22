@@ -23,7 +23,7 @@
 
 #include "FakeCamera.h"
 
-const char* cameraName = "FakeCamera";
+const char* cameraName = "FastCamera";
 
 FakeCamera::FakeCamera() :
 	initialized_(false),
@@ -34,13 +34,12 @@ FakeCamera::FakeCamera() :
 	height_(2304),
 	channels_(3)
 {
+	curImage_ = NULL;
+
 	CreateProperty(MM::g_Keyword_Name, cameraName, MM::String, true);
 	CreateProperty(MM::g_Keyword_Description, "??????", MM::String, true);
 	CreateProperty(MM::g_Keyword_CameraName, "Fake camera adapter", MM::String, true);
 	CreateProperty(MM::g_Keyword_CameraID, "FastCameraV0.1", MM::String, true);
-
-	SetErrorText(ERR_INVALID_DEVICE_NAME, "Specified stage name is invalid");
-	SetErrorText(OUT_OF_RANGE, "Parameters out of range");
 
 	InitializeDefaultErrorMessages();
 }
@@ -127,11 +126,6 @@ unsigned FakeCamera::GetNumberOfComponents() const
 	return channels_;
 }
 
-const unsigned int* FakeCamera::GetImageBufferAsRGB32()
-{
-	return 0;
-}
-
 unsigned FakeCamera::GetImageWidth() const
 {
 	return width_;
@@ -149,19 +143,15 @@ unsigned FakeCamera::GetImageBytesPerPixel() const
 
 int FakeCamera::SnapImage()
 {
-ERRH_START
 	MM::MMTime start = GetCoreCallback()->GetCurrentMMTime();
 	++frameCount_;
 
 	getImg();
 
 	MM::MMTime end = GetCoreCallback()->GetCurrentMMTime();
+	double dt = (end - start).getMsec();
 
-	double rem = exposure_ - (end - start).getMsec();
-
-	if (rem > 0)
-		CDeviceUtils::SleepMs((long)rem);
-ERRH_END
+	return DEVICE_OK;
 }
 
 int FakeCamera::StartSequenceAcquisition(long numImages, double interval_ms, bool stopOnOverflow)

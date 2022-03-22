@@ -88,12 +88,10 @@
     </ProjectReference>
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="error_code.cpp" />
     <ClCompile Include="FakeCamera.cpp" />
     <ClCompile Include="module.cpp" />
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="error_code.h" />
     <ClInclude Include="FakeCamera.h" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />

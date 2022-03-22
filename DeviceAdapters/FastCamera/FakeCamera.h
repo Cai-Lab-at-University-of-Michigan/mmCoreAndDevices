@@ -27,12 +27,6 @@
 
 #include "DeviceBase.h"
 
-#define ERR_INVALID_DEVICE_NAME 10000
-#define OUT_OF_RANGE 10001
-#define CONTROLLER_ERROR 10002
-
-#include "error_code.h"
-
 extern const char* cameraName;
 
 class parse_error : public std::exception {};
@@ -67,11 +61,10 @@ public:
 	void OnThreadExiting() throw();
 
 	unsigned GetNumberOfComponents() const;
-	const unsigned int* GetImageBufferAsRGB32();
 
 	void getImg() const;
 
-//private:
+private:
 	bool initialized_;
 	int frameCount_;
 	bool capturing_;
@@ -80,4 +73,5 @@ public:
 	mutable unsigned channels_;
 	unsigned byteCount_;
 	double exposure_;
+	void* curImage_;
 };
