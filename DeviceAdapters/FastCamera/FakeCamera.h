@@ -35,34 +35,34 @@ class FakeCamera : public CCameraBase<FakeCamera>
 {
 public:
 	FakeCamera();
-	~FakeCamera();
+	~FakeCamera() {};
 
 	// Inherited via CCameraBase
 	int Initialize();
 	int Shutdown();
 	void GetName(char * name) const;
 	long GetImageBufferSize() const;
-	unsigned GetBitDepth() const;
-	int GetBinning() const;
-	int SetBinning(int binSize);
-	void SetExposure(double exp_ms);
-	double GetExposure() const;
-	int SetROI(unsigned x, unsigned y, unsigned xSize, unsigned ySize);
-	int GetROI(unsigned & x, unsigned & y, unsigned & xSize, unsigned & ySize);
-	int ClearROI();
+	unsigned GetBitDepth() const { return 8 * byteCount_; };
+	int GetBinning() const { return 1; };
+	int SetBinning(int binSize) { return DEVICE_OK; };
+	void SetExposure(double exp_ms) { exposure_ = exp_ms; };
+	double GetExposure() const { return exposure_; };
+	int SetROI(unsigned x, unsigned y, unsigned xSize, unsigned ySize) { return DEVICE_OK; }
+	int GetROI(unsigned& x, unsigned& y, unsigned& xSize, unsigned& ySize) { return DEVICE_OK; };
+	int ClearROI() { return DEVICE_OK; };
 	int IsExposureSequenceable(bool & isSequenceable) const;
 	const unsigned char * GetImageBuffer();
 	const unsigned char * GetImageBuffer(unsigned channelNr);
-	unsigned GetImageWidth() const;
-	unsigned GetImageHeight() const;
-	unsigned GetImageBytesPerPixel() const;
+	unsigned GetImageWidth() const { return width_; };
+	unsigned GetImageHeight() const { return height_; };
+	unsigned GetImageBytesPerPixel() const { return byteCount_; };
 	int SnapImage();
 	int StartSequenceAcquisition(long numImages, double interval_ms, bool stopOnOverflow);
 	int StopSequenceAcquisition();
 	void OnThreadExiting() throw();
 
-	unsigned GetNumberOfComponents() const;
-	unsigned GetNumberOfChannels() const;
+	unsigned GetNumberOfComponents() const { return 1;  };
+	unsigned GetNumberOfChannels() const { return channels_; };
 
 	void getImg() const;
 

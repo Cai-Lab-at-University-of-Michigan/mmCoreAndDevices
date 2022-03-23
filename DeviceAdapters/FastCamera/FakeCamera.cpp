@@ -22,6 +22,7 @@
 //                limitations under the License.
 
 #include "FakeCamera.h"
+#include<iostream>
 
 const char* cameraName = "FastCamera";
 
@@ -57,10 +58,6 @@ FakeCamera::FakeCamera() :
 	InitializeDefaultErrorMessages();
 }
 
-FakeCamera::~FakeCamera()
-{
-}
-
 int FakeCamera::Initialize()
 {
 	initialized_ = true;
@@ -83,46 +80,6 @@ long FakeCamera::GetImageBufferSize() const
 	return GetImageWidth() * GetImageHeight() * GetImageBytesPerPixel();
 }
 
-unsigned FakeCamera::GetBitDepth() const
-{
-	return 8 * byteCount_;
-}
-
-int FakeCamera::GetBinning() const
-{
-	return 1;
-}
-
-int FakeCamera::SetBinning(int binSize)
-{
-	return DEVICE_OK;
-}
-
-void FakeCamera::SetExposure(double exposure)
-{
-	exposure_ = exposure;
-}
-
-double FakeCamera::GetExposure() const
-{
-	return exposure_;
-}
-
-int FakeCamera::SetROI(unsigned x, unsigned y, unsigned xSize, unsigned ySize)
-{
-	return DEVICE_OK;
-}
-
-int FakeCamera::GetROI(unsigned & x, unsigned & y, unsigned & xSize, unsigned & ySize)
-{
-	return DEVICE_OK;
-}
-
-int FakeCamera::ClearROI()
-{
-	return DEVICE_OK;
-}
-
 int FakeCamera::IsExposureSequenceable(bool & isSequenceable) const
 {
 	isSequenceable = false;
@@ -141,31 +98,6 @@ const unsigned char * FakeCamera::GetImageBuffer(unsigned channelNr)
 	return curImage_;
 }
 
-unsigned FakeCamera::GetNumberOfComponents() const
-{
-	return 1;
-}
-
-unsigned FakeCamera::GetNumberOfChannels() const
-{
-	return channels_;
-}
-
-unsigned FakeCamera::GetImageWidth() const
-{
-	return width_;
-}
-
-unsigned FakeCamera::GetImageHeight() const
-{
-	return height_;
-}
-
-unsigned FakeCamera::GetImageBytesPerPixel() const
-{
-	return byteCount_;
-}
-
 int FakeCamera::SnapImage()
 {
 	MM::MMTime start = GetCoreCallback()->GetCurrentMMTime();
@@ -176,11 +108,13 @@ int FakeCamera::SnapImage()
 	MM::MMTime end = GetCoreCallback()->GetCurrentMMTime();
 	double dt = (end - start).getMsec();
 
+	//std::cout << "Snap Called " << dt << std::endl;
 	return DEVICE_OK;
 }
 
 int FakeCamera::StartSequenceAcquisition(long numImages, double interval_ms, bool stopOnOverflow)
 {
+	std::cout << "Starting sequence acquisition " << numImages << '-' << interval_ms << std::endl;
 	capturing_ = true;
 	return CCameraBase::StartSequenceAcquisition(numImages, interval_ms, stopOnOverflow);
 }
