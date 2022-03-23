@@ -28,7 +28,7 @@
 // Exported MMDevice API
 MODULE_API void InitializeModuleData()
 {
-	RegisterDevice(cameraName, MM::CameraDevice, "Fake camera that loads images from disk");
+	RegisterDevice(cameraName, MM::CameraDevice, "Fast Camera Dev Build");
 }
 
 MODULE_API MM::Device* CreateDevice(const char* deviceName)

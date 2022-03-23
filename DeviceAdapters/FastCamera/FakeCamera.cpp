@@ -34,6 +34,7 @@ FakeCamera::FakeCamera() :
 	height_(2304),
 	channels_(3)
 {
+	blankImage_ = (unsigned char *) malloc(GetImageBufferSize());
 	curImage_ = NULL;
 
 	CreateProperty(MM::g_Keyword_Name, cameraName, MM::String, true);
@@ -67,7 +68,7 @@ void FakeCamera::GetName(char * name) const
 
 long FakeCamera::GetImageBufferSize() const
 {
-	return width_ * height_ * GetImageBytesPerPixel();
+	return GetImageWidth() * GetImageHeight() * GetImageBytesPerPixel();
 }
 
 unsigned FakeCamera::GetBitDepth() const
@@ -118,7 +119,8 @@ int FakeCamera::IsExposureSequenceable(bool & isSequenceable) const
 
 const unsigned char * FakeCamera::GetImageBuffer()
 {
-	return NULL;
+	if (curImage_ == NULL) return blankImage_;
+	return curImage_;
 }
 
 unsigned FakeCamera::GetNumberOfComponents() const
@@ -138,7 +140,7 @@ unsigned FakeCamera::GetImageHeight() const
 
 unsigned FakeCamera::GetImageBytesPerPixel() const
 {
-	return byteCount_ * channels_;
+	return byteCount_ * GetNumberOfComponents();
 }
 
 int FakeCamera::SnapImage()

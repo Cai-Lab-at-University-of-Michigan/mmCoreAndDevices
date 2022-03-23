@@ -73,5 +73,6 @@ private:
 	mutable unsigned channels_;
 	unsigned byteCount_;
 	double exposure_;
-	void* curImage_;
+	unsigned char* curImage_;
+	unsigned char* blankImage_;
 };
