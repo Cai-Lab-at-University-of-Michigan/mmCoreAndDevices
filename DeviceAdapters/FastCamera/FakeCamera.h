@@ -52,6 +52,7 @@ public:
 	int ClearROI();
 	int IsExposureSequenceable(bool & isSequenceable) const;
 	const unsigned char * GetImageBuffer();
+	const unsigned char * GetImageBuffer(unsigned channelNr);
 	unsigned GetImageWidth() const;
 	unsigned GetImageHeight() const;
 	unsigned GetImageBytesPerPixel() const;
@@ -61,6 +62,7 @@ public:
 	void OnThreadExiting() throw();
 
 	unsigned GetNumberOfComponents() const;
+	unsigned GetNumberOfChannels() const;
 
 	void getImg() const;
 
@@ -75,4 +77,5 @@ private:
 	double exposure_;
 	unsigned char* curImage_;
 	unsigned char* blankImage_;
+	unsigned char* oneImage_;
 };

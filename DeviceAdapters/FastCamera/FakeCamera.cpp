@@ -35,12 +35,24 @@ FakeCamera::FakeCamera() :
 	channels_(3)
 {
 	blankImage_ = (unsigned char *) malloc(GetImageBufferSize());
+	oneImage_ = (unsigned char*) malloc(GetImageBufferSize());
+
+	unsigned short* oneImageCast_ = (unsigned short *) oneImage_;
+	for (int i = 0; i < GetImageWidth() * GetImageHeight(); i++) {
+		oneImageCast_[i] = 500;
+	}
+
 	curImage_ = NULL;
 
 	CreateProperty(MM::g_Keyword_Name, cameraName, MM::String, true);
 	CreateProperty(MM::g_Keyword_Description, "??????", MM::String, true);
 	CreateProperty(MM::g_Keyword_CameraName, "Fake camera adapter", MM::String, true);
 	CreateProperty(MM::g_Keyword_CameraID, "FastCameraV0.1", MM::String, true);
+
+	CreateProperty(MM::g_Keyword_Binning, "1", MM::Integer, false);
+	std::vector<std::string> binningValues;
+	binningValues.push_back("1");
+	SetAllowedValues(MM::g_Keyword_Binning, binningValues);
 
 	InitializeDefaultErrorMessages();
 }
@@ -117,13 +129,24 @@ int FakeCamera::IsExposureSequenceable(bool & isSequenceable) const
 	return DEVICE_OK;
 }
 
-const unsigned char * FakeCamera::GetImageBuffer()
+const unsigned char* FakeCamera::GetImageBuffer()
 {
+	return GetImageBuffer(0);
+}
+
+const unsigned char * FakeCamera::GetImageBuffer(unsigned channelNr)
+{
+	if (channelNr % 2 == 1) return oneImage_;
 	if (curImage_ == NULL) return blankImage_;
 	return curImage_;
 }
 
 unsigned FakeCamera::GetNumberOfComponents() const
+{
+	return 1;
+}
+
+unsigned FakeCamera::GetNumberOfChannels() const
 {
 	return channels_;
 }
@@ -140,7 +163,7 @@ unsigned FakeCamera::GetImageHeight() const
 
 unsigned FakeCamera::GetImageBytesPerPixel() const
 {
-	return byteCount_ * GetNumberOfComponents();
+	return byteCount_;
 }
 
 int FakeCamera::SnapImage()
