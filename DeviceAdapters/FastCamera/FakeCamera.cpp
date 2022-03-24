@@ -24,26 +24,31 @@
 #include "FakeCamera.h"
 #include<iostream>
 
+#define INTERNAL_DEBUG_MODE 0
+
 const char* cameraName = "FastCamera";
 
 FakeCamera::FakeCamera() :
 	initialized_(false),
-	capturing_(false),
 	byteCount_(2),
 	exposure_(10),
 	width_(2304),
 	height_(2304),
-	channels_(3),
+	channels_(4),
 	components_(1),
-	bitDepth_(8)
+	bitDepth_(16),
+	liveThread_(0)
 {
+	liveThread_ = new LiveThread(this);
+
 	blankImage_ = (unsigned char *) malloc(GetImageBufferSize());
 	oneImage_ = (unsigned char*) malloc(GetImageBufferSize());
 
 	unsigned short* oneImageCast_ = (unsigned short *) oneImage_;
-	for (unsigned int i = 0; i < GetImageWidth() * GetImageHeight() * channels_; i++) {
-		oneImageCast_[i] = i / (GetImageWidth() * GetImageHeight());
-	}
+
+	//for (unsigned short i = 0; i < GetImageWidth() * GetImageHeight() * GetNumberOfChannels(); i++) {
+	//	oneImageCast_[i] = i / (GetImageWidth() * GetImageHeight());
+	//}
 
 	curImage_ = NULL;
 	
@@ -69,6 +74,8 @@ int FakeCamera::Initialize()
 int FakeCamera::Shutdown()
 {
 	initialized_ = false;
+	delete liveThread_;
+	liveThread_ = 0;
 	return DEVICE_OK;
 }
 
@@ -90,22 +97,23 @@ int FakeCamera::IsExposureSequenceable(bool & isSequenceable) const
 
 const unsigned char* FakeCamera::GetImageBuffer()
 {
-	std::cout << "requestedImageBuffer [DEF]" << std::endl;
+	if(INTERNAL_DEBUG_MODE)
+		std::cout << "requestedImageBuffer [DEF]" << std::endl;
 	return GetImageBuffer(0);
 }
 
 const unsigned char * FakeCamera::GetImageBuffer(unsigned channelNr)
 {
-	std::cout << "requestedImageBuffer [" << channelNr << "]" << std::endl;
-	return oneImage_ + (channelNr * GetImageHeight() * GetImageWidth() * GetImageBytesPerPixel() );
-	if (channelNr % 2 == 0) return oneImage_;
-	if (curImage_ == NULL) return blankImage_;
-	return curImage_;
+	if(INTERNAL_DEBUG_MODE)
+		std::cout << "requestedImageBuffer [" << channelNr << "]" << std::endl;
+	return oneImage_ + (channelNr * GetImageWidth() * GetImageHeight() * GetImageBytesPerPixel());
 }
 
 int FakeCamera::SnapImage()
 {
-	std::cout << "Snap Called: " << frameCount_ << std::endl;
+	if(INTERNAL_DEBUG_MODE)
+		std::cout << "Snap Called: " << frameCount_ << std::endl;
+	
 	MM::MMTime start = GetCoreCallback()->GetCurrentMMTime();
 	++frameCount_;
 
@@ -120,24 +128,135 @@ int FakeCamera::SnapImage()
 
 int FakeCamera::StartSequenceAcquisition(long numImages, double interval_ms, bool stopOnOverflow)
 {
-	std::cout << "Starting sequence acquisition " << numImages << '-' << interval_ms << std::endl;
-	capturing_ = true;
-	return CCameraBase::StartSequenceAcquisition(numImages, interval_ms, stopOnOverflow);
+	if(INTERNAL_DEBUG_MODE)
+		std::cout << "Starting sequence acquisition " << numImages << '-' << interval_ms << std::endl;
+	
+	if (IsCapturing()) return DEVICE_CAMERA_BUSY_ACQUIRING;
+
+	GetCoreCallback()->PrepareForAcq(this);
+
+	// Start Camera
+
+	liveThread_->SetNumImages(numImages);
+	startTime_ = GetCoreCallback()->GetCurrentMMTime();
+	liveThread_->activate();
+
+	return DEVICE_OK;
+	//return CCameraBase::StartSequenceAcquisition(numImages, interval_ms, stopOnOverflow);
 }
 
 int FakeCamera::StopSequenceAcquisition()
 {
-	capturing_ = false;
-	return CCameraBase::StopSequenceAcquisition();
+	// Stop Camera
+	liveThread_->Abort();
+	GetCoreCallback()->AcqFinished(this, 0);
+	return DEVICE_OK;
+	//return CCameraBase::StopSequenceAcquisition();
+}
+
+bool FakeCamera::IsCapturing() {
+	return liveThread_->IsRunning();
 }
 
 void FakeCamera::OnThreadExiting() throw()
 {
-	capturing_ = false;
 	CCameraBase::OnThreadExiting();
 }
 
 
 void FakeCamera::getImg() const {
 	return;
+}
+
+int FakeCamera::LiveThread::svc()
+{
+	stopRunning_ = false;
+	running_ = true;
+	imageCounter_ = 0;
+
+	// put the hardware into a continuous acqusition state
+	while (true) {
+		if (stopRunning_)
+			break;
+
+		int ret = cam_->SnapImage();
+
+		if (ret != DEVICE_OK) {
+			char txt[1000];
+			sprintf(txt, "FastCamera Live Thread: ImageSnap() error %d", ret);
+			cam_->GetCoreCallback()->LogMessage(cam_, txt, false);
+			break;
+		}
+
+		char label[MM::MaxStrLength];
+
+		cam_->GetLabel(label);
+
+		MM::MMTime timestamp = cam_->GetCurrentMMTime();
+		Metadata md;
+
+		MetadataSingleTag mstStartTime(MM::g_Keyword_Metadata_StartTime, label, true);
+		mstStartTime.SetValue(CDeviceUtils::ConvertToString(cam_->startTime_.getMsec()));
+		md.SetTag(mstStartTime);
+
+		MetadataSingleTag mstElapsed(MM::g_Keyword_Elapsed_Time_ms, label, true);
+		MM::MMTime elapsed = timestamp - cam_->startTime_;
+		mstElapsed.SetValue(CDeviceUtils::ConvertToString(elapsed.getMsec()));
+		md.SetTag(mstElapsed);
+
+		MetadataSingleTag mstCount(MM::g_Keyword_Metadata_ImageNumber, label, true);
+		mstCount.SetValue(CDeviceUtils::ConvertToString(imageCounter_));
+		md.SetTag(mstCount);
+
+		// insert all channels
+		for (unsigned i = 0; i < cam_->GetNumberOfChannels(); i++)
+		{
+			char buf[MM::MaxStrLength];
+			MetadataSingleTag mstChannel(MM::g_Keyword_CameraChannelIndex, label, true);
+			snprintf(buf, MM::MaxStrLength, "%d", i);
+			mstChannel.SetValue(buf);
+			md.SetTag(mstChannel);
+
+			MetadataSingleTag mstChannelName(MM::g_Keyword_CameraChannelName, label, true);
+			cam_->GetChannelName(i, buf);
+			mstChannelName.SetValue(buf);
+			md.SetTag(mstChannelName);
+
+			ret = cam_->GetCoreCallback()->InsertImage(cam_, cam_->GetImageBuffer(i),
+				cam_->GetImageWidth(),
+				cam_->GetImageHeight(),
+				cam_->GetImageBytesPerPixel(),
+				md.Serialize().c_str());
+			if (ret == DEVICE_BUFFER_OVERFLOW) {
+				cam_->GetCoreCallback()->ClearImageBuffer(cam_);
+				cam_->GetCoreCallback()->InsertImage(cam_, cam_->GetImageBuffer(i),
+					cam_->GetImageWidth(),
+					cam_->GetImageHeight(),
+					cam_->GetImageBytesPerPixel(),
+					md.Serialize().c_str());
+			}
+			else if (ret != DEVICE_OK) {
+				cam_->GetCoreCallback()->LogMessage(cam_, "BitFlow thread: error inserting image", false);
+				break;
+			}
+		}
+
+
+		imageCounter_++;
+		if (numImages_ >= 0 && imageCounter_ >= numImages_) {
+			cam_->StopSequenceAcquisition();
+		}
+		//{
+		//	cam_->bfDev_.StopContinuousAcq();
+		//	break;
+		//}
+
+	}
+	running_ = false;
+	return 0;
+}
+
+void FakeCamera::LiveThread::Abort() {
+	stopRunning_ = true;
+	wait();
 }

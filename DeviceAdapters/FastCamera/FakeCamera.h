@@ -35,12 +35,12 @@ class FakeCamera : public CCameraBase<FakeCamera>
 {
 public:
 	FakeCamera();
-	~FakeCamera() {};
+	~FakeCamera() { delete liveThread_; };
 
 	// Inherited via CCameraBase
 	int Initialize();
 	int Shutdown();
-	void GetName(char * name) const;
+	void GetName(char* name) const;
 	long GetImageBufferSize() const;
 	unsigned GetBitDepth() const { return bitDepth_; };
 	int GetBinning() const { return 1; };
@@ -50,9 +50,9 @@ public:
 	int SetROI(unsigned x, unsigned y, unsigned xSize, unsigned ySize) { return DEVICE_OK; }
 	int GetROI(unsigned& x, unsigned& y, unsigned& xSize, unsigned& ySize) { return DEVICE_OK; };
 	int ClearROI() { return DEVICE_OK; };
-	int IsExposureSequenceable(bool & isSequenceable) const;
-	const unsigned char * GetImageBuffer();
-	const unsigned char * GetImageBuffer(unsigned channelNr);
+	int IsExposureSequenceable(bool& isSequenceable) const;
+	const unsigned char* GetImageBuffer();
+	const unsigned char* GetImageBuffer(unsigned channelNr);
 	unsigned GetImageWidth() const { return width_; };
 	unsigned GetImageHeight() const { return height_; };
 	unsigned GetImageBytesPerPixel() const { return byteCount_; };
@@ -60,6 +60,7 @@ public:
 	int StartSequenceAcquisition(long numImages, double interval_ms, bool stopOnOverflow);
 	int StopSequenceAcquisition();
 	void OnThreadExiting() throw();
+	bool IsCapturing();
 
 	unsigned GetNumberOfComponents() const { return components_; };
 	unsigned GetNumberOfChannels() const { return channels_; };
@@ -67,9 +68,9 @@ public:
 	void getImg() const;
 
 private:
+	MM::MMTime startTime_;
 	bool initialized_;
 	int frameCount_;
-	bool capturing_;
 	mutable unsigned width_;
 	mutable unsigned height_;
 	mutable unsigned channels_;
@@ -80,4 +81,27 @@ private:
 	unsigned char* curImage_;
 	unsigned char* blankImage_;
 	unsigned char* oneImage_;
+
+	friend class LiveThread;
+	class LiveThread : public MMDeviceThreadBase {
+		public:
+			LiveThread(FakeCamera* cam) : cam_(cam), stopRunning_(false), running_(false), imageCounter_(0),
+				numImages_(-1) {}
+			~LiveThread() {}
+
+			bool IsRunning() { return running_; }
+			void Abort();
+			void SetNumImages(long num) { numImages_ = num; }
+
+			// thread procedure
+			int svc();
+
+		private:
+			FakeCamera* cam_;
+			bool running_;
+			bool stopRunning_;
+			long imageCounter_;
+			long numImages_;
+	};
+	LiveThread* liveThread_;
 };
