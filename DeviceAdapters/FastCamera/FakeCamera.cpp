@@ -33,20 +33,22 @@ FakeCamera::FakeCamera() :
 	exposure_(10),
 	width_(2304),
 	height_(2304),
-	channels_(3)
+	channels_(3),
+	components_(1),
+	bitDepth_(8)
 {
 	blankImage_ = (unsigned char *) malloc(GetImageBufferSize());
 	oneImage_ = (unsigned char*) malloc(GetImageBufferSize());
 
 	unsigned short* oneImageCast_ = (unsigned short *) oneImage_;
-	for (int i = 0; i < GetImageWidth() * GetImageHeight(); i++) {
-		oneImageCast_[i] = 500;
+	for (unsigned int i = 0; i < GetImageWidth() * GetImageHeight() * channels_; i++) {
+		oneImageCast_[i] = i / (GetImageWidth() * GetImageHeight());
 	}
 
 	curImage_ = NULL;
-
+	
 	CreateProperty(MM::g_Keyword_Name, cameraName, MM::String, true);
-	CreateProperty(MM::g_Keyword_Description, "??????", MM::String, true);
+	CreateProperty(MM::g_Keyword_Description, "[??????]", MM::String, true);
 	CreateProperty(MM::g_Keyword_CameraName, "Fake camera adapter", MM::String, true);
 	CreateProperty(MM::g_Keyword_CameraID, "FastCameraV0.1", MM::String, true);
 
@@ -77,7 +79,7 @@ void FakeCamera::GetName(char * name) const
 
 long FakeCamera::GetImageBufferSize() const
 {
-	return GetImageWidth() * GetImageHeight() * GetImageBytesPerPixel();
+	return GetImageWidth() * GetImageHeight() * GetImageBytesPerPixel() * GetNumberOfChannels();
 }
 
 int FakeCamera::IsExposureSequenceable(bool & isSequenceable) const
@@ -88,18 +90,22 @@ int FakeCamera::IsExposureSequenceable(bool & isSequenceable) const
 
 const unsigned char* FakeCamera::GetImageBuffer()
 {
+	std::cout << "requestedImageBuffer [DEF]" << std::endl;
 	return GetImageBuffer(0);
 }
 
 const unsigned char * FakeCamera::GetImageBuffer(unsigned channelNr)
 {
-	if (channelNr % 2 == 1) return oneImage_;
+	std::cout << "requestedImageBuffer [" << channelNr << "]" << std::endl;
+	return oneImage_ + (channelNr * GetImageHeight() * GetImageWidth() * GetImageBytesPerPixel() );
+	if (channelNr % 2 == 0) return oneImage_;
 	if (curImage_ == NULL) return blankImage_;
 	return curImage_;
 }
 
 int FakeCamera::SnapImage()
 {
+	std::cout << "Snap Called: " << frameCount_ << std::endl;
 	MM::MMTime start = GetCoreCallback()->GetCurrentMMTime();
 	++frameCount_;
 
@@ -108,7 +114,7 @@ int FakeCamera::SnapImage()
 	MM::MMTime end = GetCoreCallback()->GetCurrentMMTime();
 	double dt = (end - start).getMsec();
 
-	//std::cout << "Snap Called " << dt << std::endl;
+	std::cout << "Snap Finished " << dt << std::endl;
 	return DEVICE_OK;
 }
 
@@ -132,7 +138,6 @@ void FakeCamera::OnThreadExiting() throw()
 }
 
 
-void FakeCamera::getImg() const
-{
+void FakeCamera::getImg() const {
 	return;
 }

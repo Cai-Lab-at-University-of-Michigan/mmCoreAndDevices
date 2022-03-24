@@ -42,7 +42,7 @@ public:
 	int Shutdown();
 	void GetName(char * name) const;
 	long GetImageBufferSize() const;
-	unsigned GetBitDepth() const { return 8 * byteCount_; };
+	unsigned GetBitDepth() const { return bitDepth_; };
 	int GetBinning() const { return 1; };
 	int SetBinning(int binSize) { return DEVICE_OK; };
 	void SetExposure(double exp_ms) { exposure_ = exp_ms; };
@@ -61,7 +61,7 @@ public:
 	int StopSequenceAcquisition();
 	void OnThreadExiting() throw();
 
-	unsigned GetNumberOfComponents() const { return 1;  };
+	unsigned GetNumberOfComponents() const { return components_; };
 	unsigned GetNumberOfChannels() const { return channels_; };
 
 	void getImg() const;
@@ -74,6 +74,8 @@ private:
 	mutable unsigned height_;
 	mutable unsigned channels_;
 	unsigned byteCount_;
+	unsigned components_;
+	unsigned bitDepth_;
 	double exposure_;
 	unsigned char* curImage_;
 	unsigned char* blankImage_;
