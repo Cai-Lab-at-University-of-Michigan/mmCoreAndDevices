@@ -36,19 +36,20 @@ FakeCamera::FakeCamera() :
 	height_(2304),
 	channels_(4),
 	components_(1),
-	bitDepth_(16),
-	liveThread_(0)
+	bitDepth_(16)
 {
 	liveThread_ = new LiveThread(this);
 
 	blankImage_ = (unsigned char *) malloc(GetImageBufferSize());
 	oneImage_ = (unsigned char*) malloc(GetImageBufferSize());
 
-	unsigned short* oneImageCast_ = (unsigned short *) oneImage_;
+	memset(blankImage_, 0, GetImageBufferSize());
+	memset(oneImage_, 0, GetImageBufferSize());
 
-	//for (unsigned short i = 0; i < GetImageWidth() * GetImageHeight() * GetNumberOfChannels(); i++) {
-	//	oneImageCast_[i] = i / (GetImageWidth() * GetImageHeight());
-	//}
+	unsigned short* oneImageCast_ = (unsigned short *) oneImage_;
+	for (unsigned int i = 0; i < 2304 * 2304; i++)
+		for (unsigned int j = 0; j < GetNumberOfChannels(); j++ )
+			((unsigned short *) oneImage_)[i + (j * 2304 * 2304)] = j+1;
 
 	curImage_ = NULL;
 	
@@ -118,6 +119,7 @@ int FakeCamera::SnapImage()
 	++frameCount_;
 
 	getImg();
+	while( (GetCoreCallback()->GetCurrentMMTime() - start).getMsec() < 1.1 );
 
 	MM::MMTime end = GetCoreCallback()->GetCurrentMMTime();
 	double dt = (end - start).getMsec();
@@ -236,7 +238,7 @@ int FakeCamera::LiveThread::svc()
 					md.Serialize().c_str());
 			}
 			else if (ret != DEVICE_OK) {
-				cam_->GetCoreCallback()->LogMessage(cam_, "BitFlow thread: error inserting image", false);
+				cam_->GetCoreCallback()->LogMessage(cam_, "FastCamera thread: error inserting image", false);
 				break;
 			}
 		}
